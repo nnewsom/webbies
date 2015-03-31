@@ -35,6 +35,9 @@ class Classifier(object):
         self.resolver = DNSResolver(nameservers=resolvers)
 
         self.ua = ua
+        self.headers = { 
+                'User-Agent': self.ua
+            }
 
         self.sslc = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
         self.sslc.check_hostname = False
@@ -130,6 +133,7 @@ class Classifier(object):
                                                         allow_redirects=False,
                                                         connector=self.conn,
                                                         loop = self.loop,
+                                                        headers=self.headers
                                                        )
                     if webby.ssl:
                         cert_der = response.connection._transport.get_extra_info('socket').getpeercert(True)

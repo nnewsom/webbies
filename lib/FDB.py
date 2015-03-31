@@ -33,6 +33,10 @@ class FDB(object):
         self.wordlist = wordlist
         self.queue = set()
 
+        self.headers = {
+                'User-Agent': choice(useragents)
+            }
+
         self.resolver = DNSResolver(nameservers=resolvers)
         self.sslc = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
         self.sslc.check_hostname = False
@@ -134,6 +138,7 @@ class FDB(object):
                                                 url,
                                                 allow_redirects=False,
                                                 connector=self.conn,
+                                                headers=self.headers,
                                             )
 
                 body = yield from response.text(encoding='ascii')
