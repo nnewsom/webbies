@@ -14,6 +14,7 @@ from .Common import *
 class Classifier(object):
     def __init__(self,scope,webbies,verbosity,ua,loop=None,resolvers=[],bing_key="",limit=1):
         self.ALTNAME_EXTENSION = 2
+        self.MAX_REDIRECTS = 5
 
         self.scope = scope
         self.loop = loop if loop else asyncio.get_event_loop()
@@ -127,6 +128,7 @@ class Classifier(object):
             webby = yield from self.webbies_resolved.get()
             paths = set('/')
             response = None
+            redirects = 0
             while len(paths):
                 path = paths.pop()
                 try:
@@ -153,6 +155,12 @@ class Classifier(object):
                             self.queue_new_webby(ip="",hostname=vname,port=webby.port)
 
                     if response.status in (300, 301, 302, 303, 307):
+                        redirects +=1
+
+                        if redirects > self.MAX_REDIRECTS:
+                            yield from self.process_response(webby,response)
+                            break
+
                         urlp = urlparse(response.headers['LOCATION'])
                         if urlp.netloc:
                             port = 0
