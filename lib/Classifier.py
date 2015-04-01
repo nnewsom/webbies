@@ -65,10 +65,10 @@ class Classifier(object):
     def enum_webbies(self):
         while True:
             webby = yield from self.webbies_new.get()
-            if self.verbosity:
-                print_success("Attempting to enumerate webby: {i}({h}:{p})".format(p=webby.port,i=webby.ip,h=webby.hostname))
 
             if webby not in self.webbies_history:
+                if self.verbosity:
+                    print_success("Attempting to enumerate webby: {i}({h}:{p})".format(p=webby.port,i=webby.ip,h=webby.hostname))
                 with(yield from self.control):
                     self.webbies_history.add(webby)
                 if webby.hostname and not webby.ip:
@@ -131,7 +131,7 @@ class Classifier(object):
                 path = paths.pop()
                 try:
                     if self.verbosity:
-                        print_success("attempting to gather webby: {s}({ip})".format(s=webby.base_url(),ip=webby.ip))
+                        print_success("attempting to gather webby: {s} ({ip})".format(s=webby.base_url(),ip=webby.ip))
                     webby.url = urljoin(webby.base_url(),path)
                     response = yield from aiohttp.request('GET',
                                                         webby.url,
