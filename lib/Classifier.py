@@ -186,6 +186,10 @@ class Classifier(object):
                     webby.success = False
                     webby.error_msg = "{etype}:{emsg}".format(etype=type(dns_error),emsg=str(dns_error))
                     self.webbies_completed.add(webby)
+                except ssl.SSLError as ssl_error:
+                    webby.success = False
+                    webby.error_msg = "{etype}:{emsg}".format(etype=type(ssl_error),emsg=str(ssl_error))
+                    self.webbies_completed.add(webby)
 
     @asyncio.coroutine
     def process_response(self,webby,response):
