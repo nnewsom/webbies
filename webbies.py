@@ -69,7 +69,7 @@ if __name__ == "__main__":
             print_error("Failed reading scope argument. %s" % ex)
             sys.exit(0)
     else:
-        iprange = filter(None,map(lambda x: x.ip,webbies))
+        iprange = filter(None,map(lambda x: x[0],webbies)) #tuple (ip,hostname,port)
         myScope = Scope(iprange,verbosity=args.verbosity)
 
     myClassifier = Classifier(
