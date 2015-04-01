@@ -1,8 +1,9 @@
-import asyncio 
+import asyncio
 import aiohttp
 import ssl
 import re
 import OpenSSL
+import aiodns
 from urllib.parse import urljoin,urlparse
 from .Webby import Webby
 from .DNSResolver import DNSResolver
@@ -19,8 +20,6 @@ class Classifier(object):
 
         self.webbies_new = asyncio.Queue(loop=self.loop)
         self.webbies_history = set()
-        for webby in webbies:
-            self.webbies_new.put_nowait(webby)
 
         self.webbies_resolved = asyncio.Queue(loop=self.loop)
         self.webbies_completed = set()
@@ -32,10 +31,11 @@ class Classifier(object):
         self.resolvers = resolvers
         self.verbosity = verbosity
         self.limit = limit
+        self.control = asyncio.Semaphore(1)
         self.resolver = DNSResolver(nameservers=resolvers)
 
         self.ua = ua
-        self.headers = { 
+        self.headers = {
                 'User-Agent': self.ua
             }
 
@@ -49,6 +49,9 @@ class Classifier(object):
                     )
         self.conn.set_resolver(self.resolver)
 
+        for ip,host,port in webbies:
+            self.queue_new_webby(ip,host,port)
+
     def close(self):
         self.conn.close()
 
@@ -56,7 +59,7 @@ class Classifier(object):
         for ssl in [True,False]:
             new_webby = Webby(ip=ip,hostname=hostname,port=port,ssl=ssl)
             if new_webby not in self.webbies_history:
-                self.webbies_resolved.put_nowait(new_webby)
+                self.webbies_new.put_nowait(new_webby)
 
     @asyncio.coroutine
     def enum_webbies(self):
@@ -64,8 +67,10 @@ class Classifier(object):
             webby = yield from self.webbies_new.get()
             if self.verbosity:
                 print_success("Attempting to enumerate webby: {i}({h}:{p})".format(p=webby.port,i=webby.ip,h=webby.hostname))
+
             if webby not in self.webbies_history:
-                self.webbies_history.add(webby)
+                with(yield from self.control):
+                    self.webbies_history.add(webby)
                 if webby.hostname and not webby.ip:
                     ips = yield from self.resolver.query_name(webby.hostname)
                     for ip in ips:
@@ -81,40 +86,40 @@ class Classifier(object):
                             self.queue_new_webby(webby.ip,hostname,webby.port)
                     else:
                         print_warning("Excluding '{ip}'; Not in scope.".format(ip=webby.ip))
+
+                if self.bing_key:
+                    try:
+                        xbing = Bing(self.bing_key) #note: cascades at this point. azure might not like it
+                        if webby.hostname and webby.hostname not in self.bing_vname_history:
+                            if self.verbosity:
+                                print_info("searching bing for hostname '{vname}'".format(vname=webby.hostname))
+                            yield xbing.search_domain(webby.hostname)
+                            self.bing_vname_history.add(webby.hostname)
+                        if webby.ip and webby.ip not in self.bing_ip_history:
+                            if self.verbosity:
+                                print_info("searching bing for ip '{ip}'".format(ip=webby.ip))
+                            self.bing_ip_history.add(webby.ip)
+                            yield xbing.search_ip(webby.ip)
+
+                        for host_port_combo in xbing.uniq_hosts:
+                            hostid,port = host_port_combo.split(':')
+                            ip = hostname= ""
+                            if re.search('^[0-9]{1,3}(\.[0-9]{1,3}){3}$',hostid):
+                                ip = hostid
+                                hostname = ""
+                            else:
+                                hostname = hostid
+                                ip = ""
+                            self.queue_new_webby(ip,hostname,port)
+
+                    except Exception as ex:
+                        print_error("Bing search failed:{etype} {msg}".format(etype=type(ex),msg=str(ex)))
+
+            if webby.ip:
+                if self.scope.in_scope(webby.ip):
+                    self.webbies_resolved.put_nowait(webby)
                 else:
-                    if self.scope.in_scope(webby.ip):
-                        self.webbies_resolved.put_nowait(webby)
-                    else:
-                        print_warning("Excluding '{ip}({hostname})'; Not in scope.".format(ip=webby.ip,hostname=webby.hostname))
-
-            if self.bing_key:
-                try:
-                    xbing = Bing(self.bing_key) #note: cascades at this point. azure might not like it
-                    if webby.hostname and webby.hostname not in self.bing_vname_history:
-                        if self.verbosity:
-                            print_info("searching bing for hostname '{vname}'".format(vname=webby.hostname))
-                        yield xbing.search_domain(webby.hostname)
-                        self.bing_vname_history.add(webby.hostname)
-                    if webby.ip and webby.ip not in self.bing_ip_history:
-                        if self.verbosity:
-                            print_info("searching bing for ip '{ip}'".format(ip=webby.ip))
-                        self.bing_ip_history.add(webby.ip)
-                        yield xbing.search_ip(webby.ip)
-
-                    for host_port_combo in xbing.uniq_hosts:
-                        hostid,port = host_port_combo.split(':')
-                        ip = hostname= ""
-                        if re.search('^[0-9]{1,3}(\.[0-9]{1,3}){3}$',hostid):
-                            ip = hostid
-                            hostname = ""
-                        else:
-                            hostname = hostid
-                            ip = ""
-                        self.queue_new_webby(ip,hostname,port)
-
-                except Exception as ex:
-                    print_error("Bing search failed:{etype} {msg}".format(etype=type(ex),msg=str(ex)))
-
+                    print_warning("Excluding '{ip}({hostname})'; Not in scope.".format(ip=webby.ip,hostname=webby.hostname))
 
     @asyncio.coroutine
     def gather_webbies(self):
@@ -126,7 +131,7 @@ class Classifier(object):
                 path = paths.pop()
                 try:
                     if self.verbosity:
-                        print_success("attempting to gather webby: {s}".format(s=webby.base_url()))
+                        print_success("attempting to gather webby: {s}({ip})".format(s=webby.base_url(),ip=webby.ip))
                     webby.url = urljoin(webby.base_url(),path)
                     response = yield from aiohttp.request('GET',
                                                         webby.url,
@@ -163,10 +168,9 @@ class Classifier(object):
                             else:
                                 webby.redirect_url = response.headers['LOCATION']
                                 if re.search('[A-Za-z]',host):
-                                    new_webby = Webby(ip="",hostname=host,port=port)
+                                    self.queue_new_webby(ip="",hostname=host,port=port)
                                 else:
-                                    new_webby = Webby(ip=host,hostname="",port=port)
-                                yield from self.webbies_new.put(new_webby)
+                                    self.queue_new_webby(ip=host,hostname="",port=port)
 
                             yield from self.process_response(webby,response)
                         else:
@@ -178,16 +182,25 @@ class Classifier(object):
                     webby.success = False
                     webby.error_msg = "{etype}:{emsg}".format(etype=type(client_error),emsg=str(client_error))
                     self.webbies_completed.add(webby)
+                except aiodns.error.DNSError as dns_error:
+                    webby.success = False
+                    webby.error_msg = "{etype}:{emsg}".format(etype=type(dns_error),emsg=str(dns_error))
+                    self.webbies_completed.add(webby)
 
     @asyncio.coroutine
     def process_response(self,webby,response):
         webby.code = response.status
-        body = yield from response.text(encoding='ascii')
+        try:
+            body = yield from response.text(encoding='ascii')
+        except UnicodeDecodeError:
+            body = yield from response.text()
+            body = body.encode('ascii','replace').decode()
+
         webby.last_response = body
         title_RE = re.compile(r'< *title *>(?P<title>.*?)< */title *>',re.I)
 
         if 'server' in response.headers:
-            webby.banner = response.headers['server'] 
+            webby.banner = response.headers['server']
         if re.search('< *FORM',body,re.I):
             webby.forms = True
         if re.search('input.*type\s*=\s*(?:\'|"| *)password',body,re.I):

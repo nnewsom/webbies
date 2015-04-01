@@ -31,12 +31,11 @@ class Harvester(object):
 
             for tcp_item in host.findall('./ReportItem[@pluginID="10335"]'):
                 if re.search(r'(www|htt|web)',tcp_item.attrib['svc_name'],re.I):
-                    self.webbies.add(Webby(ip,hostname,tcp_item.attrib['port']))
+                    self.webbies.add((ip,hostname,www.attrib['port']))
             svc_names = ['www','https?','http?','http_proxy','http','https']
             for svc_name in svc_names:
                 for www in host.findall('./ReportItem[@svc_name="%s"]' % svc_name):
-                    self.webbies.add(Webby(ip,hostname,www.attrib['port'],ssl=False))
-                    self.webbies.add(Webby(ip,hostname,www.attrib['port'],ssl=True))
+                    self.webbies.add((ip,hostname,www.attrib['port']))
 
     def harvest_gnmap_dir(self,gnmap_dir):
         for dirpath,directories,files in os.walk(gnmap_dir):
@@ -56,9 +55,8 @@ class Harvester(object):
                 host = x.group('host') if x.group('host') else ""
                 ip= x.group('ip') if x.group('ip') else ""
                 if len(openPorts) > 0 and (ip or host):
-                    for port  in openPorts:
-                            self.webbies.add(Webby(ip,host,port,ssl=False))
-                            self.webbies.add(Webby(ip,host,port,ssl=True))
+                    for port in openPorts:
+                        self.webbies.add((ip,host,port))
         return self.webbies
 
     def harvest_IL(self,IL_file):
@@ -81,10 +79,8 @@ class Harvester(object):
 
             if host and port:
                 if re.search('[a-zA-Z]',host):
-                    self.webbies.add(Webby(ip="",hostname=host,port=port,ssl=False))
-                    self.webbies.add(Webby(ip="",hostname=host,port=port,ssl=True))
+                    self.webbies.add(("",host,port))
                 else:
-                    self.webbies.add(Webby(ip=host,hostname="",port=port,ssl=False))
-                    self.webbies.add(Webby(ip=host,hostname="",port=port,ssl=True))
+                    self.webbies.add((host,"",port))
             else:
                 print_error("Error reading host from line {0}".format(i))
