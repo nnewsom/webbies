@@ -36,7 +36,6 @@ class CustomTCPConnector(aiohttp.TCPConnector):
                         )
 
                 return hosts
-                
             else:
                 if key not in self._resolved_hosts:
                     infos = yield from self._loop.getaddrinfo(

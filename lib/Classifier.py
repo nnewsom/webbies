@@ -178,17 +178,12 @@ class Classifier(object):
                     else:
                         yield from self.process_response(webby,response)
 
-                except aiohttp.ClientError as client_error:
+                except (aiohttp.ClientError,
+                        aiodns.error.DNSError,
+                        ssl.SSLError,
+                        TypeError) as client_error:
                     webby.success = False
                     webby.error_msg = "{etype}:{emsg}".format(etype=type(client_error),emsg=str(client_error))
-                    self.webbies_completed.add(webby)
-                except aiodns.error.DNSError as dns_error:
-                    webby.success = False
-                    webby.error_msg = "{etype}:{emsg}".format(etype=type(dns_error),emsg=str(dns_error))
-                    self.webbies_completed.add(webby)
-                except ssl.SSLError as ssl_error:
-                    webby.success = False
-                    webby.error_msg = "{etype}:{emsg}".format(etype=type(ssl_error),emsg=str(ssl_error))
                     self.webbies_completed.add(webby)
 
     @asyncio.coroutine
