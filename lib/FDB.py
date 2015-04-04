@@ -155,7 +155,7 @@ class FDB(object):
         success =False
         p = yield from self.fetch(word)
         if p:
-            self.nfh.add(p)
+            yield from self.nfh.add(p)
             success = True
         return success
 
@@ -166,7 +166,8 @@ class FDB(object):
         else:
             p =yield from self.fetch(word)
             if p:
-                if (yield from self.nfh.is_not_found(p)):
+                is404 = yield from self.nfh.is_not_found(p)
+                if (is404):
                     p.code = 404
                 del(p.body)
                 self.results.append(p)
