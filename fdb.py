@@ -17,6 +17,7 @@ if __name__== "__main__":
     parser.add_argument("-T","--threads",help="number of FDB's to run simultaneously against given list.",type=int,default=5)
     parser.add_argument("-l","--wordlist",help="wordlist to run",required=True)
     parser.add_argument("-v","--verbosity",help="verbose level; v,vv",action="count",default=0)
+    parser.add_argument("-R","--resolvers",help="comma delimited hosts to use as dns resolvers",default="")
 
     if len(sys.argv) < 2:
             parser.print_help()
@@ -56,6 +57,7 @@ if __name__== "__main__":
                 verbosity=args.verbosity,
                 output_directory=args.output_directory,
                 terminal=t,
+                resolvers=args.resolvers.split(',')
                 )
             queue.append(fdb)
         else:
