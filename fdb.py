@@ -48,7 +48,7 @@ if __name__== "__main__":
     for host in hosts:
         if urlparse(host).netloc:
             if args.base_dir:
-                host+=base_dir
+                host+=args.base_dir
             fdb = FDB(
                 host = host,
                 wordlist=args.wordlist,
