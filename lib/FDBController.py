@@ -1,10 +1,15 @@
-import asyncio
+import asyncio,gzip
 from blessed import Terminal
 from .FDB import FDB
 from .ProgressBar import ProgressBar
+from .Common import print_error
 
 class FDBController(object):
-    def __init__(self,limit=5,loop=None,terminal = None, lineno = 0):
+    def __init__(self,limit=5,loop=None,terminal = None, lineno = 0,wordlist=None,extensions=None):
+        self.extensions = []
+        self.queue = set()
+        self.max_word_length= 0
+
         self.loop = loop if loop else asyncio.get_event_loop()
         self.limit = asyncio.Semaphore(limit)
         self.control = asyncio.Semaphore(1)
@@ -21,6 +26,29 @@ class FDBController(object):
 
         self.lines_free = { _:True for _ in range(lineno+1,limit+1)}
 
+
+        try:
+            extensions  = list(filter(None,extensions.split(',')))
+            self.extensions = set(map(lambda x: '.{ext}'.format(ext=x),extensions)) | set(['/',''])
+        except Exception as ex:
+            with self.terminal.location(0,self.lineno):
+                print_error("Failure setting extensions: {msg}".format(msg=ex))
+
+        words = set()
+        try:
+            if wordlist.endswith('.gz'):
+                words = set(map(lambda x: x.replace('\r',''),filter(None,gzip.open(wordlist,'rb').read().decode().split('\n'))))
+            else:
+                words = set(filter(None,open(wordlist).read().split('\n')))
+            self.max_word_length = len(max(words)) + len(max(self.extensions)) + 1 # 1 is for the dot. ie: .html
+        except Exception as ex:
+            with self.terminal.location(0,self.lineno):
+                print_error("Failure loading wordlist {wordlist}:{msg}".format(wordlist=wordlist,msg=ex))
+
+        for word in words:
+            for ext in self.extensions:
+                self.queue.add(word+ext)
+
     @asyncio.coroutine
     def controlled_run(self,fdb):
         with(yield from self.limit):
@@ -33,10 +61,10 @@ class FDBController(object):
                             self.lines_free[line] = False
                             break
                 if not line:
-                   yield from asyncio.sleep(1) 
+                   yield from asyncio.sleep(1)
 
             fdb.update_terminal_lineno(line)
-            yield from fdb.run()
+            yield from fdb.run(queue=self.queue)
             with(yield from self.control):
                 self.lines_free[line] = True
 

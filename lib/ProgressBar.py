@@ -9,6 +9,7 @@ class ProgressBar(object):
         if not terminal:
             print(self.terminal.clear)
         self.lineno = lineno if lineno else 0
+        self.start_t = self.last_print_t = time.time()
 
     def format_time_interval(self,t):
         mins,s = divmod(int(t),60)
@@ -51,7 +52,7 @@ class ProgressBar(object):
     # modified tqdm module and wrapped in this class to control terminal printing
     # credit to author noamraph
     # tqdm source: https://github.com/noamraph/tqdm
-    def tqdm(self,iterable, total=None,desc='', mininterval=0.5, miniters=1):
+    def tqdm(self,iterable, total=None,desc='', mininterval=0.5, miniters=1,start=0):
         """
         Get an iterable object, and return an iterator which acts exactly like the
         iterable, but prints a progress meter and updates it every time a value is
@@ -68,15 +69,10 @@ class ProgressBar(object):
                 total = len(iterable)
             except TypeError:
                 total = None
-        
         prefix = desc+': ' if desc else ''
-        
-        with self.terminal.location(0,self.lineno):
-            print(prefix + self.format_meter(0, total, 0))
-        
-        start_t = last_print_t = time.time()
-        last_print_n = 0
-        n = 0
+
+        last_print_n = start
+        n = start
         for obj in iterable:
             yield obj
             # Now the object was created and processed, so we can print the meter.
@@ -84,13 +80,13 @@ class ProgressBar(object):
             if n - last_print_n >= miniters:
                 # We check the counter first, to reduce the overhead of time.time()
                 cur_t = time.time()
-                if cur_t - last_print_t >= mininterval:
+                if cur_t - self.last_print_t >= mininterval:
                     with self.terminal.location(0,self.lineno):
-                        print(prefix + self.format_meter(n, total, cur_t-start_t))
+                        print(prefix + self.format_meter(n, total, cur_t-self.start_t))
                     last_print_n = n
-                    last_print_t = cur_t
+                    self.last_print_t = cur_t
         else:
             if last_print_n < n:
                 cur_t = time.time()
                 with self.terminal.location(0,self.lineno):
-                    print(prefix + self.format_meter(n, total, cur_t-start_t))
+                    print(prefix + self.format_meter(n, total, cur_t-self.start_t))

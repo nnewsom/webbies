@@ -11,7 +11,7 @@ from .ProgressBar import ProgressBar
 from .Probe import Probe
 
 class FDB(object):
-    def __init__(self,host,wordlist,extensions,limit,resolvers=[],output_directory="",verbosity=0,loop=None,terminal=None,lineno=0):
+    def __init__(self,host,wordlist,extensions,limit,resolvers=[],output_directory="",verbosity=0,loop=None,terminal=None,lineno=0,max_word_length=20):
         self.NOT_FOUND_ATTEMPTS = 4
         self.ERROR_COUNT = 0
         self.MAX_ERROR = 25
@@ -21,7 +21,7 @@ class FDB(object):
         self.limit = limit
         self.control = asyncio.Semaphore(limit)
         self.results = []
-        self.nfh = None
+        self.nfh = NotFoundHandler(max_word=max_word_length)
         self.verbosity = verbosity
         self.max_word_length = 0
 
@@ -75,22 +75,6 @@ class FDB(object):
         except Exception as ex:
             with self.terminal.location(0,self.lineno):
                 print_error("Failure setting extensions: {msg}".format(msg=ex))
-
-        words = set()
-        try:
-            if wordlist.endswith('.gz'):
-                words = set(map(lambda x: x.replace('\r',''),filter(None,gzip.open(wordlist,'rb').read().decode().split('\n'))))
-            else:
-                words = set(filter(None,open(wordlist).read().split('\n')))
-            self.max_word_length = len(max(words)) + len(max(self.extensions)) + 1 # 1 is for the dot. ie: .html
-            self.nfh = NotFoundHandler(max_word=self.max_word_length)
-        except Exception as ex:
-            with self.terminal.location(0,self.lineno):
-                print_error("Failure loading wordlist {wordlist}:{msg}".format(wordlist=wordlist,msg=ex))
-
-        for word in words:
-            for ext in self.extensions:
-                self.queue.add(word+ext)
 
     def update_terminal_lineno(self,lineno):
         self.lineno = lineno
@@ -173,7 +157,7 @@ class FDB(object):
                 self.results.append(p)
 
     @asyncio.coroutine
-    def run(self):
+    def run(self,queue):
         self.start_time = datetime.now()
         for _ in range(self.NOT_FOUND_ATTEMPTS):
             for ext in self.extensions:
@@ -183,11 +167,17 @@ class FDB(object):
                     with self.terminal.location(0,self.lineno):
                         print_error("404 detection failed")
                         return -1
-        coros = []
-        for x in self.queue:
-            coros.append(asyncio.Task(self.probe(x),loop=self.loop))
+        count = 0
+        total = len(queue)
+        for subset in grouper(10000,queue):
+            if subset:
+                coros = []
+                for x in subset:
+                    if x:
+                        coros.append(asyncio.Task(self.probe(x),loop=self.loop))
 
-        for f in self.pb.tqdm(asyncio.as_completed(coros),total=len(coros),desc=self.host.geturl()):
-            yield from f
+                for f in self.pb.tqdm(asyncio.as_completed(coros),start=count,total=total,desc=self.host.geturl(),miniters=10):
+                    yield from f
+                count += len(coros)
         self.save_output()
         self.end()

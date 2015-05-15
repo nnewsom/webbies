@@ -1,6 +1,11 @@
 import sys,string
 from datetime import datetime
 from random import choice
+from itertools import zip_longest
+
+def grouper(n,iterable, fillvalue=None):
+    args = [iter(iterable)]* n
+    return zip_longest(fillvalue=fillvalue, *args)
 
 class color:
     HEADER = '\033[95m'

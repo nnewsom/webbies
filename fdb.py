@@ -46,6 +46,12 @@ if __name__== "__main__":
     queue = []
     t = Terminal()
     print(t.clear)
+    try:
+        fdbc = FDBController(terminal=t,wordlist=args.wordlist,extensions=args.extensions)
+    except Exception as ex:
+        print("Failed to set up controller: {etype}:{emsg}".format(etype=type(ex),emesg=ex))
+        sys.exit(-1)
+
     for host in hosts:
         if urlparse(host).netloc:
             if args.base_dir:
@@ -58,13 +64,13 @@ if __name__== "__main__":
                 verbosity=args.verbosity,
                 output_directory=args.output_directory,
                 terminal=t,
-                resolvers=args.resolvers.split(',') if args.resolvers else None
+                resolvers=args.resolvers.split(',') if args.resolvers else None,
+                max_word_length=fdbc.max_word_length
                 )
             queue.append(fdb)
         else:
             print_warning("Malformed host {host} line".format(host=host))
 
-    fdbc = FDBController(terminal=t)
     fdbc.run(queue)
     with t.location(0,args.threads+5):
         print(t.center(t.black_on_green("All FDBs completed.")))
