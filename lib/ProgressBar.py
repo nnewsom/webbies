@@ -46,7 +46,7 @@ class ProgressBar(object):
                         rate=rate
                     )
         else:
-            return '{n:d} [elapsed: {e}, {r} iters/sec'.format(n=n,e=elapsed_str,r=rate)
+            return '{n:d} [elapsed: {e}, {r} iters/sec'.format(n=n,e=time_elapsed,r=rate)
 
     # modified tqdm module and wrapped in this class to control terminal printing
     # credit to author noamraph

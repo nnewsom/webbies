@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from lib.FDB import FDB
+from lib.Common import *
 from lib.FDBController import FDBController
 
 from urllib.parse import urlparse
@@ -57,7 +58,7 @@ if __name__== "__main__":
                 verbosity=args.verbosity,
                 output_directory=args.output_directory,
                 terminal=t,
-                resolvers=args.resolvers.split(',')
+                resolvers=args.resolvers.split(',') if args.resolvers else None
                 )
             queue.append(fdb)
         else:

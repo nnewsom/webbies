@@ -79,7 +79,7 @@ class FDB(object):
         words = set()
         try:
             if wordlist.endswith('.gz'):
-                words = set(map(lambda x: x.replace('\r',''),filter(None,gzip.open(wordlist,'rb').read().split('\n'))))
+                words = set(map(lambda x: x.replace('\r',''),filter(None,gzip.open(wordlist,'rb').read().decode().split('\n'))))
             else:
                 words = set(filter(None,open(wordlist).read().split('\n')))
             self.max_word_length = len(max(words)) + len(max(self.extensions)) + 1 # 1 is for the dot. ie: .html
