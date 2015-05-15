@@ -70,6 +70,9 @@ class ProgressBar(object):
             except TypeError:
                 total = None
         prefix = desc+': ' if desc else ''
+        if not start:
+            with self.terminal.location(0,self.lineno):
+                print(prefix + self.format_meter(0, total, 0))
 
         last_print_n = start
         n = start
