@@ -1,11 +1,11 @@
 import asyncio,gzip
-from blessed import Terminal
 from .FDB import FDB
+from .TerminalWrapper import TerminalWrapper
 from .ProgressBar import ProgressBar
 from .Common import print_error
 
 class FDBController(object):
-    def __init__(self,limit=5,loop=None,terminal = None, lineno = 0,wordlist=None,extensions=None):
+    def __init__(self,limit=5,lineno=0,loop=None,pterminal = None,wordlist=None,extensions=None):
         self.extensions = []
         self.queue = set()
         self.max_word_length= 0
@@ -15,14 +15,11 @@ class FDBController(object):
         self.control = asyncio.Semaphore(1)
         self.coros = []
 
-        self.terminal = terminal if terminal else Terminal()
-        if not terminal:
-            print(self.terminal.clear)
+        self.terminalw = TerminalWrapper(lineno=lineno,pterminal=pterminal)
+        if not pterminal:
+            self.terminalw.clear()
 
-        self.pb= ProgressBar(
-                terminal = self.terminal,
-                lineno=lineno
-                )
+        self.pb= ProgressBar(pterminal = self.terminalw.terminal)
 
         self.lines_free = { _:True for _ in range(lineno+1,limit+1)}
 
@@ -31,8 +28,7 @@ class FDBController(object):
             extensions  = list(filter(None,extensions.split(',')))
             self.extensions = set(map(lambda x: '.{ext}'.format(ext=x),extensions)) | set(['/',''])
         except Exception as ex:
-            with self.terminal.location(0,self.lineno):
-                print_error("Failure setting extensions: {msg}".format(msg=ex))
+            self.terminalw.print_error("Failure setting extensions: {msg}".format(msg=ex))
 
         words = set()
         try:
@@ -42,8 +38,7 @@ class FDBController(object):
                 words = set(filter(None,open(wordlist).read().split('\n')))
             self.max_word_length = len(max(words)) + len(max(self.extensions)) + 1 # 1 is for the dot. ie: .html
         except Exception as ex:
-            with self.terminal.location(0,self.lineno):
-                print_error("Failure loading wordlist {wordlist}:{msg}".format(wordlist=wordlist,msg=ex))
+            self.terminalw.print_error("Failure loading wordlist {wordlist}:{msg}".format(wordlist=wordlist,msg=ex))
 
         for word in words:
             for ext in self.extensions:

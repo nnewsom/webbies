@@ -1,14 +1,13 @@
-from blessed import Terminal
 import time
+from .TerminalWrapper import TerminalWrapper
 
 class ProgressBar(object):
-    def __init__(self,terminal = None, lineno = 0):
+    def __init__(self,pterminal = None):
         self.N_BARS = 10
 
-        self.terminal = terminal if terminal else Terminal()
-        if not terminal:
-            print(self.terminal.clear)
-        self.lineno = lineno if lineno else 0
+        self.terminalw = TerminalWrapper(pterminal=pterminal)
+        if not pterminal:
+            self.terminalw.clear()
         self.start_t = self.last_print_t = time.time()
 
     def format_time_interval(self,t):
@@ -71,8 +70,7 @@ class ProgressBar(object):
                 total = None
         prefix = desc+': ' if desc else ''
         if not start:
-            with self.terminal.location(0,self.lineno):
-                print(prefix + self.format_meter(0, total, 0))
+            self.terminalw.print(prefix + self.format_meter(0, total, 0))
 
         last_print_n = start
         n = start
@@ -84,12 +82,10 @@ class ProgressBar(object):
                 # We check the counter first, to reduce the overhead of time.time()
                 cur_t = time.time()
                 if cur_t - self.last_print_t >= mininterval:
-                    with self.terminal.location(0,self.lineno):
-                        print(prefix + self.format_meter(n, total, cur_t-self.start_t))
+                    self.terminalw.print(prefix + self.format_meter(n, total, cur_t-self.start_t))
                     last_print_n = n
                     self.last_print_t = cur_t
         else:
             if last_print_n < n:
                 cur_t = time.time()
-                with self.terminal.location(0,self.lineno):
-                    print(prefix + self.format_meter(n, total, cur_t-self.start_t))
+                self.terminalw.print(prefix + self.format_meter(n, total, cur_t-self.start_t))

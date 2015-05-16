@@ -7,7 +7,7 @@ def grouper(n,iterable, fillvalue=None):
     args = [iter(iterable)]* n
     return zip_longest(fillvalue=fillvalue, *args)
 
-class color:
+class Color:
     HEADER = '\033[95m'
     BLUE = '\033[94m'
     GREEN = '\033[92m'
@@ -19,8 +19,8 @@ class color:
 
 def print_error(msg):
     print("{color}[!]{endc} {timestamp} {msg}".format(
-            color=color.RED,
-            endc=color.ENDC,
+            color=Color.RED,
+            endc=Color.ENDC,
             timestamp=datetime.now().strftime("%H:%M:%S.%f"),
             msg=msg
             )
@@ -28,8 +28,8 @@ def print_error(msg):
 
 def print_warning(msg):
     print("{color}[W]{endc} {timestamp} {msg}".format(
-            color=color.YELO,
-            endc=color.ENDC,
+            color=Color.YELO,
+            endc=Color.ENDC,
             timestamp=datetime.now().strftime("%H:%M:%S.%f"),
             msg=msg
             )
@@ -37,8 +37,8 @@ def print_warning(msg):
 
 def print_info(msg):
     print("{color}[I]{endc} {timestamp} {msg}".format(
-            color=color.BLUE,
-            endc=color.ENDC,
+            color=Color.BLUE,
+            endc=Color.ENDC,
             timestamp=datetime.now().strftime("%H:%M:%S.%f"),
             msg=msg
             )
@@ -46,8 +46,8 @@ def print_info(msg):
 
 def print_success(msg):
     print("{color}[*]{endc} {timestamp} {msg}".format(
-            color=color.GREEN,
-            endc=color.ENDC,
+            color=Color.GREEN,
+            endc=Color.ENDC,
             timestamp=datetime.now().strftime("%H:%M:%S.%f"),
             msg=msg
             )
@@ -56,8 +56,8 @@ def print_success(msg):
 def print_highlight(msg):
     print("{color}[*]{endc} {timestamp} {hi}{msg}{endc}".format(
             color=color.GREEN,
-            endc=color.ENDC,
-            hi=color.OPTIMUM,
+            endc=Color.ENDC,
+            hi=Color.OPTIMUM,
             timestamp=datetime.now().strftime("%H:%M:%S.%f"),
             msg=msg
             )

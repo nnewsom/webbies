@@ -2,7 +2,7 @@ import gzip,datetime,ssl
 import asyncio,aiohttp,re,os
 from urllib.parse import urljoin,urlparse
 from random import choice
-from blessed import Terminal
+from .TerminalWrapper import TerminalWrapper
 from .CustomTCPConnector import CustomTCPConnector
 from .DNSResolver import DNSResolver
 from .NotFoundHandler import NotFoundHandler
@@ -11,7 +11,7 @@ from .ProgressBar import ProgressBar
 from .Probe import Probe
 
 class FDB(object):
-    def __init__(self,host,wordlist,extensions,limit,resolvers=[],output_directory="",verbosity=0,loop=None,terminal=None,lineno=0,max_word_length=20):
+    def __init__(self,host,wordlist,extensions,limit,resolvers=[],output_directory="",verbosity=0,loop=None,pterminal=None,max_word_length=20):
         self.NOT_FOUND_ATTEMPTS = 4
         self.ERROR_COUNT = 0
         self.MAX_ERROR = 25
@@ -21,7 +21,6 @@ class FDB(object):
         self.limit = limit
         self.control = asyncio.Semaphore(limit)
         self.results = []
-        self.nfh = NotFoundHandler(max_word=max_word_length)
         self.verbosity = verbosity
         self.max_word_length = 0
 
@@ -51,40 +50,36 @@ class FDB(object):
         self.filename = "{host}_{timestamp}.txt".format(host=re.sub('[/:]+','_',host),timestamp=datetime.now().strftime("%H-%M-%S-%f"))
         self.output_path = os.path.join(output_directory,self.filename) if output_directory else os.path.join(os.getcwd(),self.filename)
 
-        self.terminal = terminal if terminal else Terminal()
-        if not terminal:
-            print(self.terminal.clear)
-        self.lineno = lineno
+        self.terminalw = TerminalWrapper(pterminal=pterminal)
+        if not pterminal:
+            self.terminal.clear()
 
-        self.pb = ProgressBar(
-                terminal = self.terminal,
-                lineno=lineno
-                )
+        self.nfh = NotFoundHandler(max_word=max_word_length)
+
+        self.pb = ProgressBar(pterminal = self.terminalw.terminal)
 
         if not host.endswith('/'):
             host = host+'/'
         try:
             self.host = urlparse(host)
         except Exception as ex:
-            with self.terminal.location(0,self.lineno):
-                print_error("Failure setting host: {msg}".format(msg=ex))
+            self.terminalw.print_error("Failure setting host: {msg}".format(msg=ex))
 
+        self.terminalw.prefix = self.host.geturl()
         try:
             extensions  = list(filter(None,extensions.split(',')))
             self.extensions = set(map(lambda x: '.{ext}'.format(ext=x),extensions)) | set(['/',''])
         except Exception as ex:
-            with self.terminal.location(0,self.lineno):
-                print_error("Failure setting extensions: {msg}".format(msg=ex))
+            self.terminalw.print_error("Failure setting extensions: {msg}".format(msg=ex))
 
     def update_terminal_lineno(self,lineno):
-        self.lineno = lineno
-        self.pb.lineno = lineno
+        self.terminalw.lineno = lineno
+        self.pb.terminalw.lineno= lineno
 
     def end(self):
-        with self.terminal.location(0,self.lineno):
-            print_success("Saved to output file: {f}{clear}".format(
-                            f=self.output_path,
-                            clear=self.terminal.clear_eol)
+        self.terminalw.print_success("Saved to output file: {f}".format(
+                                f=self.output_path
+                            )
                         )
         self.conn.close()
 
@@ -103,9 +98,7 @@ class FDB(object):
             output.close()
 
         except Exception as ex:
-            with self.terminal.location(0,self.lineno):
-                print_error("Failed creating output file {filename}: {msg}".format(filename=output_file,msg=ex))
-            sys.exit(2)
+            self.terminalw.print_error("Failed creating output file {filename}: {msg}".format(filename=output_file,msg=ex))
 
     def __log_error(self,msg):
         etime = datetime.now().strftime("%H-%M-%S-%f")
@@ -164,9 +157,8 @@ class FDB(object):
                 uri = (random_nstring(20)+ext).strip()
                 success = yield from self.not_found_probe(uri)
                 if not success:
-                    with self.terminal.location(0,self.lineno):
-                        print_error("404 detection failed")
-                        return -1
+                    self.terminalw.print_error("404 detection failed")
+                    return -1
         count = 0
         total = len(queue)
         for subset in grouper(10000,queue):

@@ -2,6 +2,7 @@
 from lib.FDB import FDB
 from lib.Common import *
 from lib.FDBController import FDBController
+from lib.TerminalWrapper import TerminalWrapper
 
 from urllib.parse import urlparse
 from blessed import Terminal
@@ -44,12 +45,12 @@ if __name__== "__main__":
         hosts.append(args.host)
 
     queue = []
-    t = Terminal()
-    print(t.clear)
+    tw = TerminalWrapper()
+    tw.clear()
     try:
-        fdbc = FDBController(terminal=t,wordlist=args.wordlist,extensions=args.extensions)
+        fdbc = FDBController(pterminal=tw.terminal,wordlist=args.wordlist,extensions=args.extensions,lineno=0)
     except Exception as ex:
-        print("Failed to set up controller: {etype}:{emsg}".format(etype=type(ex),emesg=ex))
+        tw.print_error("Failed to set up controller: {etype}:{emsg}".format(etype=type(ex),emsg=ex))
         sys.exit(-1)
 
     for host in hosts:
@@ -63,17 +64,17 @@ if __name__== "__main__":
                 limit=args.limit,
                 verbosity=args.verbosity,
                 output_directory=args.output_directory,
-                terminal=t,
+                pterminal=tw.terminal,
                 resolvers=args.resolvers.split(',') if args.resolvers else None,
                 max_word_length=fdbc.max_word_length
                 )
             queue.append(fdb)
         else:
-            print_warning("Malformed host {host} line".format(host=host))
+            tw.print_warning("Malformed host {host} line".format(host=host))
 
     fdbc.run(queue)
-    with t.location(0,args.threads+5):
-        print(t.center(t.black_on_green("All FDBs completed.")))
-    with t.cbreak():
-        t.inkey()
-    print(t.clear)
+    with tw.terminal.location(0,args.threads+5):
+        print(tw.terminal.center(tw.terminal.black_on_green("All FDBs completed.")))
+    with tw.terminal.cbreak():
+        tw.terminal.inkey()
+    tw.clear()
