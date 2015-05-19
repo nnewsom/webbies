@@ -55,7 +55,7 @@ def print_success(msg):
 
 def print_highlight(msg):
     print("{color}[*]{endc} {timestamp} {hi}{msg}{endc}".format(
-            color=color.GREEN,
+            color=Color.GREEN,
             endc=Color.ENDC,
             hi=Color.OPTIMUM,
             timestamp=datetime.now().strftime("%H:%M:%S.%f"),

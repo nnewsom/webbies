@@ -43,6 +43,7 @@ class FDBController(object):
         for word in words:
             for ext in self.extensions:
                 self.queue.add(word+ext)
+        del(words)
 
     @asyncio.coroutine
     def controlled_run(self,fdb):

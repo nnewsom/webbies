@@ -90,7 +90,7 @@ class FDB(object):
             output.write("# start: {timestamp}\n".format(timestamp=self.start_time.strftime("%m-%d-%y_%H:%M:%S.%f")))
             output.write("# wordlist: {wordlist}\n".format(wordlist=self.wordlist))
             output.write("# extensions: {exts}\n".format(exts=self.extensions))
-            for x in filter(lambda x: x.code != 404,self.results):
+            for x in sorted(self.results,key=lambda x: x.code):
                 output.write("{code},{url},{length}\n".format(url=x.url,code=x.code,length=x.length))
             for e in self.error_log:
                 output.write("# {msg}\n".format(msg=e))
@@ -145,9 +145,10 @@ class FDB(object):
             if p:
                 is404 = yield from self.nfh.is_not_found(p)
                 if (is404):
-                    p.code = 404
-                del(p.body)
-                self.results.append(p)
+                    del(p)
+                else:
+                    del(p.body)
+                    self.results.append(p)
 
     @asyncio.coroutine
     def run(self,queue):
