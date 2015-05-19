@@ -86,7 +86,7 @@ class FDB(object):
     def save_output(self):
         try:
             output = open(self.output_path,'w')
-            output.write("# {host}\n".format(host=self.host.geturl()))
+            output.write("# url: {host}\n".format(host=self.host.geturl()))
             output.write("# start: {timestamp}\n".format(timestamp=self.start_time.strftime("%m-%d-%y_%H:%M:%S.%f")))
             output.write("# wordlist: {wordlist}\n".format(wordlist=self.wordlist))
             output.write("# extensions: {exts}\n".format(exts=self.extensions))
@@ -101,7 +101,7 @@ class FDB(object):
             self.terminalw.print_error("Failed creating output file {filename}: {msg}".format(filename=output_file,msg=ex))
 
     def __log_error(self,msg):
-        etime = datetime.now().strftime("%H-%M-%S-%f")
+        etime = datetime.now().strftime("%H:%M:%S:%f")
         self.error_log.add("{etime}::{msg}".format(etime=etime,msg=msg))
 
     @asyncio.coroutine
@@ -122,7 +122,7 @@ class FDB(object):
                 p = Probe(url,response.status,body)
 
             except aiohttp.ClientError as client_error:
-                self.__log_error(client_error)
+                self.__log_error(type(client_error)+':'+str(client_error))
                 self.ERROR_COUNT +=1
             finally:
                 return p

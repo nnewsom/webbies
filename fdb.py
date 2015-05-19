@@ -3,6 +3,7 @@ from lib.FDB import FDB
 from lib.Common import *
 from lib.FDBController import FDBController
 from lib.TerminalWrapper import TerminalWrapper
+from lib.XMLCreator import XMLCreator
 
 from urllib.parse import urlparse
 from blessed import Terminal
@@ -20,6 +21,7 @@ if __name__== "__main__":
     parser.add_argument("-l","--wordlist",help="wordlist to run",required=True)
     parser.add_argument("-v","--verbosity",help="verbose level; v,vv",action="count",default=0)
     parser.add_argument("-R","--resolvers",help="comma delimited hosts to use as dns resolvers",default="")
+    parser.add_argument("-x","--xml-output",help="change xml summary filename. (saved in output directory)",default="fdb_summary.xml")
 
     if len(sys.argv) < 2:
             parser.print_help()
@@ -73,6 +75,13 @@ if __name__== "__main__":
             tw.print_warning("Malformed host {host} line".format(host=host))
 
     fdbc.run(queue)
+    try:
+        xc = XMLCreator()
+        xc.parse(args.output_directory)
+        xc.save_xml(os.path.join(args.output_directory,args.xml_output))
+    except Exception as ex:
+        tw.print_error(ex)
+
     with tw.terminal.location(0,args.threads+5):
         print(tw.terminal.center(tw.terminal.black_on_green("All FDBs completed.")))
     with tw.terminal.cbreak():
