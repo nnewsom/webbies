@@ -12,17 +12,18 @@ from .Common import *
 
 
 class Classifier(object):
-    def __init__(self,scope,webbies,verbosity,ua,loop=None,resolvers=[],bing_key="",limit=1):
+    def __init__(self,scope,webbies,verbosity,ua,loop=None,resolvers=[],bing_key="",limit=10):
         self.ALTNAME_EXTENSION = 2
         self.MAX_REDIRECTS = 5
 
         self.scope = scope
         self.loop = loop if loop else asyncio.get_event_loop()
 
-        self.webbies_new = asyncio.Queue(loop=self.loop)
-        self.webbies_history = set()
 
-        self.webbies_resolved = asyncio.Queue(loop=self.loop)
+        self.webbies_to_enumerate = set()
+        self.webbies_to_gather = set()
+
+        self.webbies_history = set()
         self.webbies_completed = set()
 
         self.bing_key = bing_key
@@ -32,7 +33,7 @@ class Classifier(object):
         self.resolvers = resolvers
         self.verbosity = verbosity
         self.limit = limit
-        self.control = asyncio.Semaphore(1)
+        self.control = asyncio.Semaphore(limit)
         self.resolver = DNSResolver(nameservers=resolvers)
 
         self.ua = ua
@@ -60,17 +61,14 @@ class Classifier(object):
         for ssl in [True,False]:
             new_webby = Webby(ip=ip,hostname=hostname,port=port,ssl=ssl)
             if new_webby not in self.webbies_history:
-                self.webbies_new.put_nowait(new_webby)
+                self.webbies_to_enumerate.add(new_webby)
 
     @asyncio.coroutine
-    def enum_webbies(self):
-        while True:
-            webby = yield from self.webbies_new.get()
-
+    def enum_webby(self,webby):
+        with (yield from self.control):
             if webby not in self.webbies_history:
                 if self.verbosity:
                     print_success("Attempting to enumerate webby: {i}({h}:{p})".format(p=webby.port,i=webby.ip,h=webby.hostname))
-                with(yield from self.control):
                     self.webbies_history.add(webby)
                 if webby.hostname and not webby.ip:
                     ips = yield from self.resolver.query_name(webby.hostname)
@@ -118,14 +116,13 @@ class Classifier(object):
 
             if webby.ip:
                 if self.scope.in_scope(webby.ip):
-                    self.webbies_resolved.put_nowait(webby)
+                    self.webbies_to_gather.add(webby)
                 else:
                     print_warning("Excluding '{ip}({hostname})'; Not in scope.".format(ip=webby.ip,hostname=webby.hostname))
 
     @asyncio.coroutine
-    def gather_webbies(self):
-        while True:
-            webby = yield from self.webbies_resolved.get()
+    def gather_webby(self,webby):
+        with (yield from self.control):
             paths = set('/')
             response = None
             redirects = 0
@@ -222,24 +219,19 @@ class Classifier(object):
         webby.success = True
         self.webbies_completed.add(webby)
 
-    @asyncio.coroutine
-    def monitor(self):
-        yield from asyncio.sleep(2) # wait for things to start up
-        while True:
-            if self.webbies_resolved.empty() and self.webbies_new.empty():
-                self.loop.stop()
-                return
-            yield from asyncio.sleep(3)
-
     def run(self):
-        coros = []
-        for _ in range(self.limit):
-            coros.append(asyncio.Task(self.enum_webbies(),loop=self.loop))
-            coros.append(asyncio.Task(self.gather_webbies(),loop=self.loop))
+        while len(self.webbies_to_enumerate) or len(self.webbies_to_gather):
+            coros = []
+            while len(self.webbies_to_enumerate):
+                webby = self.webbies_to_enumerate.pop()
+                coros.append(asyncio.Task(self.enum_webby(webby),loop=self.loop))
 
-        background = asyncio.Task(self.monitor(),loop=self.loop)
-        self.loop.run_forever()
-        for w in coros:
-            w.cancel()
-        background.cancel()
+            self.loop.run_until_complete(asyncio.gather(*coros))
+
+            coros = []
+            while len(self.webbies_to_gather):
+                webby = self.webbies_to_gather.pop()
+                coros.append(asyncio.Task(self.gather_webby(webby),loop=self.loop))
+
+            self.loop.run_until_complete(asyncio.gather(*coros))
         self.close()
