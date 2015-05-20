@@ -12,13 +12,13 @@ from .Common import *
 
 
 class Classifier(object):
-    def __init__(self,scope,webbies,verbosity,ua,loop=None,resolvers=[],bing_key="",limit=10):
+    def __init__(self,scope,webbies,verbosity,ua,loop=None,resolvers=[],bing_key="",limit=10,timeout=10):
         self.ALTNAME_EXTENSION = 2
         self.MAX_REDIRECTS = 5
+        self.TIMEOUT = timeout
 
         self.scope = scope
         self.loop = loop if loop else asyncio.get_event_loop()
-
 
         self.webbies_to_enumerate = set()
         self.webbies_to_gather = set()
@@ -132,56 +132,65 @@ class Classifier(object):
                     if self.verbosity:
                         print_success("attempting to gather webby: {s} ({ip})".format(s=webby.base_url(),ip=webby.ip))
                     webby.url = urljoin(webby.base_url(),path)
-                    response = yield from aiohttp.request('GET',
-                                                        webby.url,
-                                                        allow_redirects=False,
-                                                        connector=self.conn,
-                                                        loop = self.loop,
-                                                        headers=self.headers
-                                                       )
-                    if webby.ssl:
-                        cert_der = response.connection._transport.get_extra_info('socket').getpeercert(True)
-                        x509 = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_ASN1,cert_der)
-                        x509_sub = x509.get_subject()
-                        cn = x509_sub.__getattr__('commonName')
-                        if not cn.count('*'):
-                            self.queue_new_webby(ip="",hostname=cn,port=webby.port)
-                        alt_names = filter(lambda x: x.count('DNS:'),str(x509.get_extension(self.ALTNAME_EXTENSION)).split(','))
-                        alt_names = map(lambda x: str(x).split(':',1)[1],alt_names)
-                        for vname in alt_names:
-                            self.queue_new_webby(ip="",hostname=vname,port=webby.port)
-
-                    if response.status in (300, 301, 302, 303, 307):
-                        redirects +=1
-
-                        if redirects > self.MAX_REDIRECTS:
-                            yield from self.process_response(webby,response)
-                            break
-
-                        urlp = urlparse(response.headers['LOCATION'])
-                        if urlp.netloc:
-                            port = 0
-                            host = ""
-                            if urlp.netloc.count(':'):
-                                host,port = urlp.netloc.split(':',1)
-                            else:
-                                host = urlp.netloc
-                                port = 443 if urlp.scheme == "https" else 80
-
-                            if port == webby.port and ( host == webby.hostname or host == webby.ip):
-                                paths.add(urlp.path)
-                            else:
-                                webby.redirect_url = response.headers['LOCATION']
-                                if re.search('[A-Za-z]',host):
-                                    self.queue_new_webby(ip="",hostname=host,port=port)
-                                else:
-                                    self.queue_new_webby(ip=host,hostname="",port=port)
-
-                            yield from self.process_response(webby,response)
-                        else:
-                            paths.add(urlp.path)
+                    task = aiohttp.request('GET',
+                                            webby.url,
+                                            allow_redirects=False,
+                                            connector=self.conn,
+                                            loop = self.loop,
+                                            headers=self.headers
+                                           )
+                    #aiohttp doesn't have a timeout
+                    #asycnio.wait_for raises an exception but does not kill the task
+                    #hack_solution
+                    done,pending = yield from asyncio.wait([task],timeout=self.TIMEOUT)
+                    if pending:
+                        for task in pending:
+                            task.cancel()
                     else:
-                        yield from self.process_response(webby,response)
+                        response = yield from done.pop()
+                        if webby.ssl:
+                            cert_der = response.connection._transport.get_extra_info('socket').getpeercert(True)
+                            x509 = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_ASN1,cert_der)
+                            x509_sub = x509.get_subject()
+                            cn = x509_sub.__getattr__('commonName')
+                            if not cn.count('*'):
+                                self.queue_new_webby(ip="",hostname=cn,port=webby.port)
+                            alt_names = filter(lambda x: x.count('DNS:'),str(x509.get_extension(self.ALTNAME_EXTENSION)).split(','))
+                            alt_names = map(lambda x: str(x).split(':',1)[1],alt_names)
+                            for vname in alt_names:
+                                self.queue_new_webby(ip="",hostname=vname,port=webby.port)
+
+                        if response.status in (300, 301, 302, 303, 307):
+                            redirects +=1
+
+                            if redirects > self.MAX_REDIRECTS:
+                                yield from self.process_response(webby,response)
+                                break
+
+                            urlp = urlparse(response.headers['LOCATION'])
+                            if urlp.netloc:
+                                port = 0
+                                host = ""
+                                if urlp.netloc.count(':'):
+                                    host,port = urlp.netloc.split(':',1)
+                                else:
+                                    host = urlp.netloc
+                                    port = 443 if urlp.scheme == "https" else 80
+
+                                if port == webby.port and ( host == webby.hostname or host == webby.ip):
+                                    paths.add(urlp.path)
+                                else:
+                                    webby.redirect_url = response.headers['LOCATION']
+                                    if re.search('[A-Za-z]',host):
+                                        self.queue_new_webby(ip="",hostname=host,port=port)
+                                    else:
+                                        self.queue_new_webby(ip=host,hostname="",port=port)
+
+                                yield from self.process_response(webby,response)
+                            else:
+                                paths.add(urlp.path)
+                        else:
+                            yield from self.process_response(webby,response)
 
                 except (aiohttp.ClientError,
                         aiodns.error.DNSError,
@@ -234,4 +243,5 @@ class Classifier(object):
                 coros.append(asyncio.Task(self.gather_webby(webby),loop=self.loop))
 
             self.loop.run_until_complete(asyncio.gather(*coros))
+
         self.close()
