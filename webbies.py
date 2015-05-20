@@ -99,11 +99,13 @@ if __name__ == "__main__":
             if not args.output.endswith('.csv'):
                 args.output = args.output+'.csv'
             with open(args.output,'w') as fp:
+                fp.write("#webbies")
                 fp.write("#ip,hostname,port,protocol,service,banner,notes,priority\n")
                 for webby in filter(lambda x: x.success, myClassifier.webbies_completed):
                     fp.write(str(webby)+'\n')
 
             with open(args.output.replace('.csv','_error_log.csv'),'w') as fp:
+                fp.write("#webbies errors")
                 fp.write("#ip,hostname,port,protocol,service,banner,notes,priority\n")
                 for webby in filter(lambda x: not x.success, myClassifier.webbies_completed):
                     fp.write(str(webby)+'\n')
