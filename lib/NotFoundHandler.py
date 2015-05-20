@@ -65,6 +65,8 @@ class NotFoundHandler:
 
     @asyncio.coroutine
     def is_not_found(self,xprobe):
+        if int(xprobe.code) == 404:
+            return True
         x_bhash = md5(xprobe.body.encode('ascii')).hexdigest()
         try:
             x_shash = md5(
