@@ -37,7 +37,7 @@ class XMLCreator(object):
                         host,port = urlp.netloc.split(':')
                     else:
                         host = urlp.netloc
-                        port = 80 if urlp.scheme == 'http' else 443
+                        port = "80" if urlp.scheme == 'http' else "443"
                     start =startRE.findall(data)[0]
                     stop = stopRE.findall(data)[0]
                     wordlist = wordlistRE.findall(data)[0]

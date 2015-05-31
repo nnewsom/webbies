@@ -6,16 +6,15 @@ class TerminalWrapper:
     def __init__(self, pterminal = None, prefix="Controller",lineno=0):
         self.terminal = Terminal() if not pterminal else pterminal
         self.prefix = prefix
-
         self.lineno = lineno
-        self.last_print_n = 0
 
     def _print(self,msg):
-        msg += ' '*(self.last_print_n - len(msg))
-        self.last_print_n = len(msg)
-
         with self.terminal.location(0,self.lineno):
-            print(msg)
+            print("{msg}{clear}".format(
+                            msg=msg,
+                            clear=self.terminal.clear_eol
+                        )
+                 )
 
     def print(self,msg):
         self._print(msg)

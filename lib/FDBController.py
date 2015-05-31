@@ -1,4 +1,5 @@
 import asyncio,gzip
+from random import shuffle
 from .FDB import FDB
 from .TerminalWrapper import TerminalWrapper
 from .ProgressBar import ProgressBar
@@ -14,6 +15,7 @@ class FDBController(object):
         self.limit = asyncio.Semaphore(limit)
         self.control = asyncio.Semaphore(1)
         self.coros = []
+
 
         self.terminalw = TerminalWrapper(lineno=lineno,pterminal=pterminal)
         if not pterminal:
@@ -71,7 +73,8 @@ class FDBController(object):
 
     def run(self,queue):
         self.coros = []
-        for fdb in queue:
+        for fdb in shuffle(queue):
             self.coros.append(asyncio.Task(self.controlled_run(fdb),loop=self.loop))
 
         self.loop.run_until_complete(self.controlled_run_all())
+

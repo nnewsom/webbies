@@ -49,41 +49,43 @@ if __name__== "__main__":
     queue = []
     tw = TerminalWrapper()
     tw.clear()
-    try:
-        fdbc = FDBController(pterminal=tw.terminal,wordlist=args.wordlist,extensions=args.extensions,lineno=0)
-    except Exception as ex:
-        tw.print_error("Failed to set up controller: {etype}:{emsg}".format(etype=type(ex),emsg=ex))
-        sys.exit(-1)
+    with tw.terminal.hidden_cursor():
+        try:
+            fdbc = FDBController(pterminal=tw.terminal,wordlist=args.wordlist,extensions=args.extensions,lineno=0)
+        except Exception as ex:
+            tw.print_error("Failed to set up controller: {etype}:{emsg}".format(etype=type(ex),emsg=ex))
+            sys.exit(-1)
 
-    for host in hosts:
-        if urlparse(host).netloc:
-            if args.base_dir:
-                host+=args.base_dir
-            fdb = FDB(
-                host = host,
-                wordlist=args.wordlist,
-                extensions= args.extensions,
-                limit=args.limit,
-                verbosity=args.verbosity,
-                output_directory=args.output_directory,
-                pterminal=tw.terminal,
-                resolvers=args.resolvers.split(',') if args.resolvers else None,
-                max_word_length=fdbc.max_word_length
-                )
-            queue.append(fdb)
-        else:
-            tw.print_warning("Malformed host {host} line".format(host=host))
+        for host in hosts:
+            if urlparse(host).netloc:
+                if args.base_dir:
+                    host+=args.base_dir
+                fdb = FDB(
+                    host = host,
+                    wordlist=args.wordlist,
+                    extensions= args.extensions,
+                    limit=args.limit,
+                    verbosity=args.verbosity,
+                    output_directory=args.output_directory,
+                    pterminal=tw.terminal,
+                    resolvers=args.resolvers.split(',') if args.resolvers else None,
+                    max_word_length=fdbc.max_word_length
+                    )
+                queue.append(fdb)
+            else:
+                tw.print_warning("Malformed host {host} line".format(host=host))
 
-    fdbc.run(queue)
-    try:
-        xc = XMLCreator()
-        xc.parse(args.output_directory)
-        xc.save_xml(os.path.join(args.output_directory,args.xml_output))
-    except Exception as ex:
-        tw.print_error(ex)
+        fdbc.run(queue)
+        try:
+            xc = XMLCreator()
+            xc.parse(args.output_directory)
+            xc.save_xml(os.path.join(args.output_directory,args.xml_output))
+        except Exception as ex:
+            tw.print_error(ex)
 
-    with tw.terminal.location(0,args.threads+5):
-        print(tw.terminal.center(tw.terminal.black_on_green("All FDBs completed.")))
-    with tw.terminal.cbreak():
-        tw.terminal.inkey()
-    tw.clear()
+        with tw.terminal.location(0,args.threads+5):
+            print(tw.terminal.center(tw.terminal.black_on_green("All FDBs completed.")))
+
+        with tw.terminal.cbreak():
+            tw.terminal.inkey()
+        tw.clear()
