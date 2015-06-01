@@ -105,7 +105,7 @@ if __name__ == "__main__":
                     fp.write(str(webby)+'\n')
 
             with open(args.output.replace('.csv','_error_log.csv'),'w') as fp:
-                fp.write("#webbies errors")
+                fp.write("#webbies errors\n")
                 fp.write("#ip,hostname,port,protocol,service,banner,notes,priority\n")
                 for webby in filter(lambda x: not x.success, myClassifier.webbies_completed):
                     fp.write(str(webby)+'\n')

@@ -72,8 +72,9 @@ class FDBController(object):
             yield from f
 
     def run(self,queue):
+        shuffle(queue)
         self.coros = []
-        for fdb in shuffle(queue):
+        for fdb in queue:
             self.coros.append(asyncio.Task(self.controlled_run(fdb),loop=self.loop))
 
         self.loop.run_until_complete(self.controlled_run_all())

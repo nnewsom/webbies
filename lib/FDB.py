@@ -41,11 +41,15 @@ class FDB(object):
         self.sslc.check_hostname = False
         self.sslc.verify_mode = ssl.CERT_NONE
 
-        self.conn = CustomTCPConnector(
+        #self.conn = CustomTCPConnector(
+        #            ssl_context=self.sslc,
+        #            loop=self.loop
+        #            )
+        #self.conn.set_resolver(self.resolver)
+        self.conn = aiohttp.TCPConnector(
                     ssl_context=self.sslc,
                     loop=self.loop
                     )
-        self.conn.set_resolver(self.resolver)
 
         self.filename = "{host}_{timestamp}.txt".format(host=re.sub('[/:]+','_',host),timestamp=datetime.now().strftime("%H-%M-%S-%f"))
         self.output_path = os.path.join(output_directory,self.filename) if output_directory else os.path.join(os.getcwd(),self.filename)
