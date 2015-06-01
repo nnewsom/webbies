@@ -4,6 +4,8 @@ import ssl
 import re
 import OpenSSL
 import aiodns
+import os
+import sys
 from urllib.parse import urljoin,urlparse
 from .Bing import Bing
 from .Webby import Webby
@@ -46,11 +48,16 @@ class Classifier(object):
         self.sslc.check_hostname = False
         self.sslc.verify_mode = ssl.CERT_NONE
 
-        self.conn = CustomTCPConnector(
-                    ssl_context=self.sslc,
-                    loop=self.loop
+        #self.conn = CustomTCPConnector(
+        #            ssl_context=self.sslc,
+        #            loop=self.loop
+        #            )
+        #self.conn.set_resolver(self.resolver)
+
+        self.conn = aiohttp.TCPConnector(
+                        ssl_context=self.sslc,
+                        loop=self.loop
                     )
-        self.conn.set_resolver(self.resolver)
 
         for ip,host,port in webbies:
             self.queue_new_webby(ip,host,port)
@@ -214,17 +221,23 @@ class Classifier(object):
                         else:
                             yield from self.process_response(webby,response)
 
-                except (aiohttp.ClientError,
-                        aiodns.error.DNSError,
-                        ssl.SSLError,
-                        TypeError) as client_error:
+                except Exception as e:
+                    exec_type, exec_obj, exc_tb = sys.exc_info()
+                    fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
                     webby.success = False
-                    webby.error_msg = "{etype}:{emsg}".format(etype=type(client_error),emsg=str(client_error))
+                    webby.error_msg = "{etype} {fname}:{lineno} {emsg}".format(
+                                                etype=exec_type,
+                                                fname= fname,
+                                                lineno = exc_tb.tb_lineno,
+                                                emsg=str(e)
+                                            )
                     self.webbies_completed.add(webby)
 
     @asyncio.coroutine
     def process_response(self,webby,response):
         webby.code = response.status
+        if self.verbosity > 2:
+            print('processing: {url}: http {code}'.format(url=webby.url,code=webby.code))
         try:
             body = yield from response.text(encoding='ascii')
         except UnicodeDecodeError:
