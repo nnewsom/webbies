@@ -150,16 +150,37 @@ class Classifier(object):
                     else:
                         response = yield from done.pop()
                         if webby.ssl:
-                            cert_der = response.connection._transport.get_extra_info('socket').getpeercert(True)
-                            x509 = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_ASN1,cert_der)
-                            x509_sub = x509.get_subject()
-                            cn = x509_sub.__getattr__('commonName')
-                            if not cn.count('*'):
-                                self.queue_new_webby(ip="",hostname=cn,port=webby.port)
-                            alt_names = filter(lambda x: x.count('DNS:'),str(x509.get_extension(self.ALTNAME_EXTENSION)).split(','))
-                            alt_names = map(lambda x: str(x).split(':',1)[1],alt_names)
-                            for vname in alt_names:
-                                self.queue_new_webby(ip="",hostname=vname,port=webby.port)
+                            try:
+                                cert_der = response.connection._transport.get_extra_info('socket').getpeercert(True)
+                                x509 = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_ASN1,cert_der)
+                                x509_sub = x509.get_subject()
+                                cn = x509_sub.__getattr__('commonName')
+                                if not cn.count('*'):
+                                    self.queue_new_webby(ip="",hostname=cn,port=webby.port)
+                                try:
+                                    alt_names = filter(lambda x: x.count('DNS:'),str(x509.get_extension(self.ALTNAME_EXTENSION)).split(','))
+                                    alt_names = map(lambda x: str(x).split(':',1)[1],alt_names)
+                                    for vname in alt_names:
+                                        self.queue_new_webby(ip="",hostname=vname,port=webby.port)
+                                except IndexError as ex:
+                                    if self.verbosity > 1:
+                                        print_warning("Failed alt name extraction: {ip}({hostname}):{port} {ex}".format(
+                                                                        ip = webby.ip,
+                                                                        hostname = webby.hostname,
+                                                                        port = webby.port,
+                                                                        ex = ex
+                                                                    )
+                                                     )
+                            except Exception as ex:
+                                if self.verbosity:
+                                    print_warning("Failed to extract ssl information: {ip}({hostname}):{port} {etype}:{ex}".format(
+                                                                        ip = webby.ip,
+                                                                        hostname = webby.hostname,
+                                                                        port = webby.port,
+                                                                        etype= type(ex),
+                                                                        ex = ex
+                                                                    )
+                                                     )
 
                         if response.status in (300, 301, 302, 303, 307):
                             redirects +=1
@@ -207,8 +228,12 @@ class Classifier(object):
         try:
             body = yield from response.text(encoding='ascii')
         except UnicodeDecodeError:
-            body = yield from response.text()
-            body = body.encode('ascii','replace').decode()
+            try:
+                body = yield from response.text()
+                body = body.encode('ascii','replace').decode()
+            except:
+                body = yield from response.read()
+                body = repr(body)
 
         webby.last_response = body
         title_RE = re.compile(r'< *title *>(?P<title>.*?)< */title *>',re.I)
