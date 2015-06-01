@@ -19,7 +19,7 @@ class Bing:
         self.uniq_hosts = set()
         self.uniq_urls = set()
         self.url = "https://api.datamarket.azure.com/Bing/Search/Web"
-        self.conn = conn 
+        self.conn = conn
 
     @asyncio.coroutine
     def __process(self,request):
@@ -80,7 +80,7 @@ class Bing:
             coros.append(
                 asyncio.Task(self.search(query,_),loop=self.loop)
             )
-        yield from syncio.gather(*coros)
+        yield from asyncio.gather(*coros)
         for w in coros:
             w.cancel()
         return

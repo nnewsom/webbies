@@ -5,6 +5,7 @@ import re
 import OpenSSL
 import aiodns
 from urllib.parse import urljoin,urlparse
+from .Bing import Bing
 from .Webby import Webby
 from .DNSResolver import DNSResolver
 from .CustomTCPConnector import CustomTCPConnector
@@ -92,13 +93,13 @@ class Classifier(object):
                         if webby.hostname and webby.hostname not in self.bing_vname_history:
                             if self.verbosity:
                                 print_info("searching bing for hostname '{vname}'".format(vname=webby.hostname))
-                            yield xbing.search_domain(webby.hostname)
+                            yield from xbing.search_domain(webby.hostname)
                             self.bing_vname_history.add(webby.hostname)
                         if webby.ip and webby.ip not in self.bing_ip_history:
                             if self.verbosity:
                                 print_info("searching bing for ip '{ip}'".format(ip=webby.ip))
                             self.bing_ip_history.add(webby.ip)
-                            yield xbing.search_ip(webby.ip)
+                            yield from xbing.search_ip(webby.ip)
 
                         for host_port_combo in xbing.uniq_hosts:
                             hostid,port = host_port_combo.split(':')
