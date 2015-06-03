@@ -1,4 +1,4 @@
-import gzip,datetime,ssl
+import gzip,datetime,ssl,sys
 import asyncio,aiohttp,re,os
 from urllib.parse import urljoin,urlparse
 from random import choice
@@ -15,6 +15,7 @@ class FDB(object):
         self.NOT_FOUND_ATTEMPTS = 4
         self.ERROR_COUNT = 0
         self.MAX_ERROR = 25
+        self.TIMEOUT = 10
 
         self.loop = loop if loop else asyncio.get_event_loop()
         self.extensions = extensions
@@ -102,7 +103,7 @@ class FDB(object):
             output.close()
 
         except Exception as ex:
-            self.terminalw.print_error("Failed creating output file {filename}: {msg}".format(filename=output_file,msg=ex))
+            self.terminalw.print_error("Failed creating output file {filename}: {msg}".format(filename=self.output_path,msg=ex))
 
     def __log_error(self,msg):
         etime = datetime.now().strftime("%H:%M:%S:%f")
@@ -114,19 +115,33 @@ class FDB(object):
         with (yield from self.control):
             try:
                 url = urljoin(self.host.geturl(),word)
-                response = yield from aiohttp.request(
-                                                'GET',
-                                                url,
-                                                allow_redirects=False,
-                                                connector=self.conn,
-                                                headers=self.headers,
-                                            )
+                task = aiohttp.request('GET',
+                                        url,
+                                        allow_redirects=False,
+                                        connector=self.conn,
+                                        headers=self.headers
+                                       )
 
-                body = yield from response.text(encoding='ascii')
+                response = yield from asyncio.wait_for(task,timeout=self.TIMEOUT)
+                try:
+                    body = yield from response.text(encoding='ascii')
+                except UnicodeDecodeError:
+                    body = yield from response.read()
+                    body = repr(body)
+
                 p = Probe(url,response.status,body)
 
-            except aiohttp.ClientError as client_error:
-                self.__log_error(type(client_error)+':'+str(client_error))
+            except Exception as client_error:
+                exec_type, exec_obj, exc_tb = sys.exc_info()
+                fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+
+                self.__log_error("{etype} {fname}:{lineno} {emsg}".format(
+                                                etype=exec_type,
+                                                fname= fname,
+                                                lineno = exc_tb.tb_lineno,
+                                                emsg=str(client_error)
+                                            )
+                                    )
                 self.ERROR_COUNT +=1
             finally:
                 return p
@@ -163,6 +178,7 @@ class FDB(object):
                 success = yield from self.not_found_probe(uri)
                 if not success:
                     self.terminalw.print_error("404 detection failed")
+                    self.save_output()
                     return -1
         count = 0
         total = len(queue)

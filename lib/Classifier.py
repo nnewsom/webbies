@@ -252,7 +252,7 @@ class Classifier(object):
         title_RE = re.compile(r'< *title *>(?P<title>.*?)< */title *>',re.I)
 
         if 'server' in response.headers:
-            webby.banner = response.headers['server']
+            webby.banner = response.headers['server'].replace(',','')
         if re.search('< *FORM',body,re.I):
             webby.forms = True
         if re.search('input.*type\s*=\s*(?:\'|"| *)password',body,re.I):
