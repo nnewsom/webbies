@@ -9,7 +9,7 @@ class Harvester(object):
         self.verbosity = verbosity
 
     def harvest_nessus_dir(self,nessus_dir):
-        for dirpath,directories,files in os.walk(nessusDir):
+        for dirpath,directories,files in os.walk(nessus_dir):
             for filename in [f for f in files if f.endswith('.nessus')]:
                 self.harvest_nessus(os.path.join(dirpath,filename))
 
@@ -31,7 +31,7 @@ class Harvester(object):
 
             for tcp_item in host.findall('./ReportItem[@pluginID="10335"]'):
                 if re.search(r'(www|htt|web)',tcp_item.attrib['svc_name'],re.I):
-                    self.webbies.add((ip,hostname,www.attrib['port']))
+                    self.webbies.add((ip,hostname,tcp_item.attrib['port']))
             svc_names = ['www','https?','http?','http_proxy','http','https']
             for svc_name in svc_names:
                 for www in host.findall('./ReportItem[@svc_name="%s"]' % svc_name):
